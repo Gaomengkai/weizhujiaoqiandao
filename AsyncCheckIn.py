@@ -3,6 +3,7 @@ import random
 import time
 import json
 import asyncio
+import re
 
 import httpx
 
@@ -10,6 +11,9 @@ URL_CHECKIN = 'https://v18.teachermate.cn/wechat-api/v1/class-attendance/student
 URL_COURSES = 'https://v18.teachermate.cn/wechat-api/v1/students/courses'
 URL_ACTIVESIGNS = 'https://v18.teachermate.cn/wechat-api/v1/class-attendance/student/active_signs'
 URL_REFERER_T = 'https://v18.teachermate.cn/wechat-pro-ssr/student/sign?openid={}'
+URL_GETNAME_T = 'https://v18.teachermate.cn/wechat-pro-ssr/?openid={}&from=wzj'
+
+XPATH_GETNAME = r'//*[@id="root"]/div/div/div/div[1]/div[1]'
 
 FILENAME_USEROPENID = "users.json"
 
@@ -62,17 +66,36 @@ class ColorPrint:
 async def check_check_in_loop(user):
     s = httpx.Client()
     openid = user['openid']
+    r = s.get(URL_GETNAME_T.format(openid),headers=get_header(openid=openid))
+    re_name = r'name":"([^"]+)'
+    new_name = re.search(re_name,r.text).group().replace('name":"','')
+    print(ColorPrint.green(new_name))
+    for index in range(len(userData)):
+        if userData[index]['name'] == user['name']:
+            userData[index]['name'] = new_name
+            break
+    # re-save json file
+    with open(FILENAME_USEROPENID,"w") as f:
+        json.dump(userData,f)
+    user['name'] = new_name
     for i in range(200):
-        print(f"[{user['name']}] 的 第{i}次检测")
+        print(f"[{user['name']}] 第{i}次检测")
         r = s.get(URL_ACTIVESIGNS,headers=get_header(openid=openid))
         is_open_id_ok = r.status_code == 200
         while not is_open_id_ok:
-            print(ColorPrint.red(f"[{user['name']}]登录信息失效"))
+            print(ColorPrint.red(f"[{user['name']}] 登录信息失效"))
             openid = input("在这里重新输入您的openid:").strip()
+            # Check whether openid is a url or a true id
+            if 'teachermate' in openid:
+                # get the true id
+                re_ptn = "openid=([^&]*)"
+                openid = re.search(re_ptn,openid).group().replace("openid=","")
             # Update openid info so that it can be stored in json file
+            print(ColorPrint.yellow(f"[{user['name']}] openid已经更新：{openid}"))
             for index in range(len(userData)):
                 if userData[index]['name'] == user['name']:
                     userData[index]['openid'] = openid
+                    break
             # re-save json file
             with open(FILENAME_USEROPENID,"w") as f:
                 json.dump(userData,f)
@@ -102,6 +125,7 @@ async def check_check_in_loop(user):
 async def main():
     tasks = []
     for u in userData:
+        print(ColorPrint.yellow(f"[{u['name']}] 已经加载 openid= {u['openid']}" ))
         tasks.append(asyncio.create_task(check_check_in_loop(u)))
     for task in tasks:
         await task
