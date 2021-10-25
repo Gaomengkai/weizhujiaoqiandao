@@ -18,8 +18,18 @@ python3 AsyncCheckIn.py
 
 可以检查users.json来查看
 
-需要httpx额外库
+需要以下第三方额外库：
+
+`httpx`
+
+使用如下命令安装
 
 ```bash
 $ pip install httpx
+```
+
+或者
+
+```bash
+$ pip install -r requirements.txt
 ```
