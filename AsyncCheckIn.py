@@ -8,20 +8,21 @@ import re
 
 import httpx
 
+FILENAME_USEROPENID = "users.json"
+
+TIME_INTERVAL = 30
+RANDOM_BASE = 15
+DELAY_TO_CHECKIN = 6
+ 
+LOOPS_COUNTS = 2000
+IGNORE_INVALID_OPENID = 1
+
 URL_CHECKIN = 'https://v18.teachermate.cn/wechat-api/v1/class-attendance/student-sign-in'
 URL_COURSES = 'https://v18.teachermate.cn/wechat-api/v1/students/courses'
 URL_ACTIVESIGNS = 'https://v18.teachermate.cn/wechat-api/v1/class-attendance/student/active_signs'
 URL_REFERER_T = 'https://v18.teachermate.cn/wechat-pro-ssr/student/sign?openid={}'
 URL_GETNAME_T = 'https://v18.teachermate.cn/wechat-pro-ssr/?openid={}&from=wzj'
 URL_CHECKINREFER_T = 'https://v18.teachermate.cn/wechat-pro-ssr/student/sign/list/{}'
-
-FILENAME_USEROPENID = "users.json"
-
-TIME_INTERVAL = 60
-RANDOM_BASE = 30
-DELAY_TO_CHECKIN = 13
-LOOPS_COUNTS = 2000
-IGNORE_INVALID_OPENID = 1
 
 UA = [
     r"Mozilla/5.0 (iPhone; CPU iPhone OS 12_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 MicroMessenger/7.0.5(0x17000523) NetType/WIFI Language/zh_CN",
@@ -55,6 +56,10 @@ class ColorPrint:
 # read user_data into a list
 with open(FILENAME_USEROPENID) as f:
     userData = json.load(f)
+    for u in userData:
+        if 'teachermate' in u['openid']:
+            re_ptn = "openid=([^&]*)"
+            u['openid'] = re.search(re_ptn,u['openid']).group().replace("openid=","")
 
 def resave_json_file(j):
     with open(FILENAME_USEROPENID,'w') as f:
@@ -96,7 +101,12 @@ def renew_openid(s,user):
                 userData[index]['openid'] = openid
                 break
         resave_json_file(userData)
-        r = s.get(URL_ACTIVESIGNS,headers=get_header(openid=openid))
+        try:
+            r = s.get(URL_ACTIVESIGNS,headers=get_header(openid=openid))
+        except Exception as e:
+            print(ColorPrint.red("网络连接失败。重试。"))
+            print(ColorPrint.red(e))
+            continue
         is_open_id_ok = r.status_code == 200
     return user
 
@@ -127,7 +137,12 @@ async def check_check_in_loop(user):
 
     for i in range(LOOPS_COUNTS):
         print(f"[{user['name']}] 第{i}次检测")
-        r = s.get(URL_ACTIVESIGNS,headers=get_header(openid=openid))
+        try:
+            r = s.get(URL_ACTIVESIGNS,headers=get_header(openid=openid))
+        except httpx.NetworkError as e:
+            print(ColorPrint.red(e))
+            await asyncio.sleep(3)
+            continue
         is_open_id_ok = r.status_code == 200
         while not is_open_id_ok:
             user = renew_openid(s,user)
