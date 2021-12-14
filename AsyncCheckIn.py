@@ -120,7 +120,7 @@ def renew_openid(s, user):
             openid = re.search(re_ptn, openid).group().replace("openid=", "")
 
         # Update openid info so that it can be stored in json file
-        print(ColorPrint.yellow(f"[{user['name']}] openid已经更新：{openid}"))
+        print(ColorPrint.yellow(f"[{user['name']}] openid已经更新:{openid}"))
         for index in range(len(userData)):
             if userData[index]['name'] == user['name']:
                 userData[index]['openid'] = openid
@@ -191,9 +191,9 @@ async def check_check_in_loop(user):
         print(js)
         # ===================END DEBUG==================
         print(
-            f"[{user['name']}] 有{ColorPrint.yellow(len(js)) if len(js) > 0 else 0}个签到！")
+            f"[{user['name']}] 有{ColorPrint.yellow(len(js)) if len(js) > 0 else 0}个签到 !")
         for j in js:
-            print(f"[{user['name']}] 课堂：{j['name']} 延时{DELAY_TO_CHECKIN}s")
+            print(f"[{user['name']}] 课堂: {j['name']} 延时{DELAY_TO_CHECKIN}s")
             await asyncio.sleep(DELAY_TO_CHECKIN)
             if j['isGPS']:
                 r = await check_in(s, openid, j['courseId'], j['signId'], lat=x12.getLat(), lon=x12.getLon())
@@ -203,12 +203,12 @@ async def check_check_in_loop(user):
                 print(ColorPrint.green(
                     f"-------------[{user['name']}] {j['name']}-签到成功！"))
                 print(
-                    f"[{user['name']}] 排名：{ColorPrint.yellow(r.json()['studentRank'])}")
+                    f"[{user['name']}] 排名: {ColorPrint.yellow(r.json()['studentRank'])}")
                 print(ColorPrint.yellow("休息20分钟"))
                 await asyncio.sleep(20*60)
             elif "repeat" in r.text:
                 print(ColorPrint.yellow(
-                    f"[{user['name']}] {j['name']}-早已经签到成功！"))
+                    f"[{user['name']}] {j['name']}-早已经签到成功 ! "))
             print(r.text)
             await asyncio.sleep(random.randint(3, 5))
         interval = TIME_INTERVAL + random.random()*RANDOM_BASE
