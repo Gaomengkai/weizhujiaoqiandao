@@ -27,10 +27,14 @@ python3 AsyncCheckIn.py
 
 `httpx`
 
+`qrcode`
+
+`websockets`
+
 使用如下命令安装
 
 ```bash
-$ pip install httpx
+$ pip install httpx qrcode websockets
 ```
 
 或者
