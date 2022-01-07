@@ -9,6 +9,8 @@ from typing import Union
 
 import httpx
 
+import AsyncQR
+
 FILENAME_USEROPENID = "users.json"
 
 TIME_INTERVAL = 30
@@ -136,7 +138,7 @@ def renew_openid(s, user):
     return user
 
 
-async def check_in(s: httpx.Client, openid: str, courseId, signId, lat=None, lon=None):
+async def check_in(client: httpx.Client, openid: str, courseId, signId, lat=None, lon=None):
     d = {
         'courseId': courseId,
         'signId': signId
@@ -144,9 +146,13 @@ async def check_in(s: httpx.Client, openid: str, courseId, signId, lat=None, lon
     if lat and lon:
         d['lat'] = lat
         d['lon'] = lon
-    r = s.post(URL_CHECKIN, data=d,
-               headers=get_header_checkin(openid, courseId))
+    r = client.post(URL_CHECKIN, data=d,
+                    headers=get_header_checkin(openid, courseId))
     return r
+
+
+async def qr_check_in(courseId, signId):
+    await AsyncQR.qrSign(courseId=courseId, signId=signId)
 
 
 async def check_check_in_loop(user):
@@ -194,14 +200,16 @@ async def check_check_in_loop(user):
             f"[{user['name']}] 有{ColorPrint.yellow(len(js)) if len(js) > 0 else 0}个签到 !")
         for j in js:
             print(f"[{user['name']}] 课堂: {j['name']} 延时{DELAY_TO_CHECKIN}s")
+            if j['isQR']:
+                await qr_check_in(j['courseId'], j['signId'])
             await asyncio.sleep(DELAY_TO_CHECKIN)
-            if j['isGPS']:
+            if False:
                 r = await check_in(s, openid, j['courseId'], j['signId'], lat=x12.getLat(), lon=x12.getLon())
             else:
                 r = await check_in(s, openid, j['courseId'], j['signId'])
             if 'Rank' in r.text:
                 print(ColorPrint.green(
-                    f"-------------[{user['name']}] {j['name']}-签到成功！"))
+                    f"-------------[{user['name']}] {j['name']}-签到成功!"))
                 print(
                     f"[{user['name']}] 排名: {ColorPrint.yellow(r.json()['studentRank'])}")
                 print(ColorPrint.yellow("休息20分钟"))
