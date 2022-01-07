@@ -1,1 +1,3 @@
 httpx
+qrcode
+websockets
