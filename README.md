@@ -31,6 +31,8 @@ python3 AsyncCheckIn.py
 
 `websockets`
 
+`win10toast`
+
 使用如下命令安装
 
 ```bash
