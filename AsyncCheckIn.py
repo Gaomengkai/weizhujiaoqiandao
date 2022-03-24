@@ -1,6 +1,7 @@
 # -*-coding:utf-8 -*-
 import logging
 import random
+import threading
 import time
 import json
 import asyncio
@@ -11,14 +12,19 @@ import httpx
 
 import AsyncQR
 
+# 显示Windows10的通知
+ENABLE_TOAST = 1
+
+# 用户名
 FILENAME_USEROPENID = "users.json"
 
+# 时间参数
 TIME_INTERVAL = 30
 RANDOM_BASE = 15
 DELAY_TO_CHECKIN = 6
 
 LOOPS_COUNTS = 2000
-IGNORE_INVALID_OPENID = 1
+IGNORE_INVALID_OPENID = 0 #为true值时，忽略无效的openid
 
 URL_CHECKIN = 'https://v18.teachermate.cn/wechat-api/v1/class-attendance/student-sign-in'
 URL_COURSES = 'https://v18.teachermate.cn/wechat-api/v1/students/courses'
@@ -27,12 +33,21 @@ URL_REFERER_T = 'https://v18.teachermate.cn/wechat-pro-ssr/student/sign?openid={
 URL_GETNAME_T = 'https://v18.teachermate.cn/wechat-pro-ssr/?openid={}&from=wzj'
 URL_CHECKINREFER_T = 'https://v18.teachermate.cn/wechat-pro-ssr/student/sign/list/{}'
 
+if ENABLE_TOAST:
+    from win10toast import ToastNotifier
+    Toaster = ToastNotifier()
+
+def show_toast(title="Notification", msg="Here comes the message",
+                    icon_path=None, duration=5, threaded=False):
+    if ENABLE_TOAST:
+        Toaster.show_toast(title, msg,
+                    icon_path, duration, threaded)
 
 class Location:
     def __init__(self, lat, lon):
         self.lat = lat
         self.lon = lon
-
+ 
     def getLat(self):
         return "{:.6f}".format(self.lat + random.randint(-4, 4)*0.000001)
 
@@ -150,8 +165,9 @@ async def check_in(client: httpx.Client, openid: str, courseId, signId, lat=None
                     headers=get_header_checkin(openid, courseId))
     return r
 
-
+# extrenal function
 async def qr_check_in(courseId, signId):
+    print(f"开始扫码签到：{courseId} {signId}")
     await AsyncQR.qrSign(courseId=courseId, signId=signId)
 
 
@@ -181,9 +197,11 @@ async def check_check_in_loop(user):
 
     for i in range(LOOPS_COUNTS):
         print(f"[{user['name']}] 第{i}次检测")
+
+        # 检测是否已经签到
         try:
             r = s.get(URL_ACTIVESIGNS, headers=get_header_common(openid))
-        except httpx.NetworkError as e:
+        except Exception as e:
             print(ColorPrint.red(e))
             await asyncio.sleep(3)
             continue
@@ -198,12 +216,19 @@ async def check_check_in_loop(user):
         # ===================END DEBUG==================
         print(
             f"[{user['name']}] 有{ColorPrint.yellow(len(js)) if len(js) > 0 else 0}个签到 !")
+
+        # 检测主循环
         for j in js:
             print(f"[{user['name']}] 课堂: {j['name']} 延时{DELAY_TO_CHECKIN}s")
+            show_toast(f"[{user['name']}] 课堂: {j['name']}",f'延时{DELAY_TO_CHECKIN}',duration=5,threaded=True)
+            # Toaster.show_toast(f"[{user['name']}] 课堂: {j['name']}",f'延时{DELAY_TO_CHECKIN}',duration=5,threaded=True)
             if j['isQR']:
-                await qr_check_in(j['courseId'], j['signId'])
+                # run the coroutine of qr_check_in
+                qrtask = asyncio.create_task(qr_check_in(j['courseId'], j['signId']))
+                await asyncio.sleep(10*60)
+                continue
             await asyncio.sleep(DELAY_TO_CHECKIN)
-            if False:
+            if False: #地理位置签到选择不传递位置信息，此分支已经废弃
                 r = await check_in(s, openid, j['courseId'], j['signId'], lat=x12.getLat(), lon=x12.getLon())
             else:
                 r = await check_in(s, openid, j['courseId'], j['signId'])
@@ -213,6 +238,7 @@ async def check_check_in_loop(user):
                 print(
                     f"[{user['name']}] 排名: {ColorPrint.yellow(r.json()['studentRank'])}")
                 print(ColorPrint.yellow("休息20分钟"))
+                show_toast("签到成功！",f"课堂：{j['name']},排名:{r.json()['studentRank']}",duration=5,threaded=True)
                 await asyncio.sleep(20*60)
             elif "repeat" in r.text:
                 print(ColorPrint.yellow(
@@ -222,6 +248,8 @@ async def check_check_in_loop(user):
         interval = TIME_INTERVAL + random.random()*RANDOM_BASE
         print(f"[{user['name']}] 暂停{round(interval)}s")
         await asyncio.sleep(interval)
+    if qrtask:
+        await qrtask
 
 
 async def main():
@@ -233,4 +261,8 @@ async def main():
         await task
         time.sleep(3)
 if __name__ == '__main__':
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print(ColorPrint.red("\n\n程序已经退出"))
+        exit(0)
