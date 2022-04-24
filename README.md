@@ -6,6 +6,15 @@
 
 禁止使用本脚本进行商业化！
 
+### 运行
+
+```bash
+# 下载依赖项
+python3 -m pip install -r requirements.txt
+# 运行
+python3 AsyncCheckIn.py
+```
+
 ### 增加了*使用GPS签到*选项
 我设置的默认位置是西十二。如果想更改位置，就改`x12`.如果不想，直接给`None`传进去。
 
@@ -16,10 +25,6 @@
 参考[https://github.com/yun-mu/wzj-sign-in-weixin](https://github.com/yun-mu/wzj-sign-in-weixin)
 
 ### 异步多用户版本已经发布
-
-```bash
-python3 AsyncCheckIn.py
-```
 
 可以检查users.json来查看
 
